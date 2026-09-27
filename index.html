@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>BPSC PRT RPG: Quest Log &amp; Study Grimoire</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,600;0,700;1,700&amp;family=Inter:wght@400;500;600;700&amp;family=Orbitron:wght@700;900&amp;display=swap" rel="stylesheet"/>
+<!-- Lucide Icons CDN -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<!-- React & Babel CDN -->
+<script crossorigin="" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin="" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Canvas Confetti -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            chakra: ['"Chakra Petch"', 'sans-serif'],
+            orbitron: ['Orbitron', 'monospace'],
+          },
+          colors: {
+            game: {
+              dark: '#080c14',
+              surface: '#0f172a',
+              card: '#131e36',
+              border: '#1e293b',
+              neonGreen: '#10b981',
+              neonCyan: '#06b6d4',
+              neonAmber: '#f59e0b',
+              neonRose: '#f43f5e',
+              neonPurple: '#a855f7'
+            }
+          },
+          boxShadow: {
+            'neon-green': '0 0 15px rgba(16, 185, 129, 0.4)',
+            'neon-cyan': '0 0 15px rgba(6, 182, 212, 0.4)',
+            'neon-purple': '0 0 15px rgba(168, 85, 247, 0.4)',
+            'neon-gold': '0 0 20px rgba(245, 158, 11, 0.5)'
+          },
+          keyframes: {
+            pulseGlow: {
+              '0%, 100%': { filter: 'drop-shadow(0 0 6px #10b981)' },
+              '50%': { filter: 'drop-shadow(0 0 16px #10b981)' }
+            },
+            float: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-4px)' }
+            },
+            nicheBounce: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(4px)' }
+            }
+          },
+          animation: {
+            'glow-pulse': 'pulseGlow 2s ease-in-out infinite',
+            'float-subtle': 'float 3s ease-in-out infinite',
+            'niche-bounce': 'nicheBounce 1.5s ease-in-out infinite'
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      background-color: #080c14;
+      color: #f1f5f9;
+      font-family: 'Inter', sans-serif;
+      touch-action: manipulation;
+    }
+    .glitch-text {
+      text-shadow: 2px 2px #06b6d4, -2px -2px #f43f5e;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .hud-border {
+      position: relative;
+    }
+    .hud-border::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 6px; height: 6px;
+      border-top: 2px solid #06b6d4;
+      border-left: 2px solid #06b6d4;
+    }
+    .hud-border::after {
+      content: '';
+      position: absolute;
+      bottom: 0; right: 0; width: 6px; height: 6px;
+      border-bottom: 2px solid #10b981;
+      border-right: 2px solid #10b981;
+    }
+  </style>
+</head>
+<body class="bg-[#080c14] text-slate-100 min-h-screen pb-24 select-none">
+<div id="root"></div>
+<script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // UPDATED 6-TIER RPG RANKS DEFINITION:
+    // Tier 0: Boat (0 - 2,500) | Tier 1: Noob (2,501 - 7,500) | Tier 2: Normal (7,501 - 18,000)
+    // Tier 3: Pro (18,001 - 40,000) | Tier 4: Legend (40,001 - 85,000) | Tier 5: GOAT (85,001+)
+    const RANKS = [
+      { name: "Boat", tier: 0, min: 0, max: 2500, color: "text-slate-400", border: "border-slate-500", badge: "🛶 Tier 0", perk: "Starter Focus", icon: "🛶" },
+      { name: "Noob", tier: 1, min: 2501, max: 7500, color: "text-lime-400", border: "border-lime-500", badge: "🌱 Tier 1", perk: "Beginner Grind", icon: "🌱" },
+      { name: "Normal", tier: 2, min: 7501, max: 18000, color: "text-emerald-400", border: "border-emerald-500", badge: "⚔️ Tier 2", perk: "Consistent Scholar", icon: "⚔️" },
+      { name: "Pro", tier: 3, min: 18001, max: 40000, color: "text-cyan-400", border: "border-cyan-500", badge: "🔮 Tier 3", perk: "Subject Specialist", icon: "🔮" },
+      { name: "Legend", tier: 4, min: 40001, max: 85000, color: "text-purple-400", border: "border-purple-500", badge: "⚡ Tier 4", perk: "Cutoff Buster", icon: "⚡" },
+      { name: "GOAT", tier: 5, min: 85001, max: 9999999, color: "text-amber-400", border: "border-amber-400", badge: "👑 Tier 5", perk: "Ultimate Topper", icon: "👑" }
+    ];
+
+    const INITIAL_SYLLABUS = [
+      { id: 'sci-1', subject: 'Science', topic: 'NCERT Cl 8: Friction & Force', scert: false, notes: false, pyq: false },
+      { id: 'sci-2', subject: 'Science', topic: 'Light & Optics (Ray Diagrams)', scert: false, notes: false, pyq: false },
+      { id: 'math-1', subject: 'Maths', topic: 'Percentage, Profit & Loss Basics', scert: false, notes: false, pyq: false },
+      { id: 'math-2', subject: 'Maths', topic: 'Time & Work (Efficiency Method)', scert: false, notes: false, pyq: false },
+      { id: 'inm-1', subject: 'INM (1885-1947)', topic: '1857 Revolt & Bihar (Kunwar Singh)', scert: false, notes: false, pyq: false },
+      { id: 'inm-2', subject: 'INM (1885-1947)', topic: 'Champaran Satyagraha (1917)', scert: false, notes: false, pyq: false },
+      { id: 'geo-1', subject: 'Bihar Special & Geo', topic: 'Bihar Soils, Rivers & Climate', scert: false, notes: false, pyq: false },
+      { id: 'geo-2', subject: 'Bihar Special & Geo', topic: 'Census 2011 & Bihar Demographics', scert: false, notes: false, pyq: false },
+      { id: 'lang-1', subject: 'Language (Qualifying)', topic: 'Hindi Grammar (Vyakaran Samas/Sandhi)', scert: false, notes: false, pyq: false },
+      { id: 'lang-2', subject: 'Language (Qualifying)', topic: 'English Vocab & Drill', scert: false, notes: false, pyq: false }
+    ];
+
+    const INITIAL_ERRORS = [
+      { id: 'err-1', topic: 'Kunwar Singh Battle of Jagdishpur Date', cause: 'Silly Error', respawned: false, timestamp: 'Today 09:30 AM' },
+      { id: 'err-2', topic: 'Friction: Coefficient calculation formula', cause: 'Concept', respawned: false, timestamp: 'Today 11:15 AM' }
+    ];
+
+    // Shared AudioContext instance (initialized on user gesture)
+    let sharedAudioCtx = null;
+    function getAudioContext() {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return null;
+      if (!sharedAudioCtx) {
+        sharedAudioCtx = new AudioCtx();
+      }
+      if (sharedAudioCtx.state === 'suspended') {
+        sharedAudioCtx.resume();
+      }
+      return sharedAudioCtx;
+    }
+
+    // PUBG MOBILE LITE: Gun-cocking / Magazine Reload Synthesized Sound (~1.0s)
+    function playPubgPlaySound() {
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        // Stage 1: Magazine slide out/snap (noise burst at t=0)
+        const bufferSize = ctx.sampleRate * 0.08;
+        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+
+        const whiteNoise = ctx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.value = 1800;
+        noiseFilter.Q.value = 3.0;
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.2, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+        whiteNoise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        whiteNoise.start(now);
+
+        // Stage 2: Heavy metallic magazine lock click (t = 0.22s)
+        const oscMag = ctx.createOscillator();
+        const gainMag = ctx.createGain();
+        oscMag.type = 'triangle';
+        oscMag.frequency.setValueAtTime(320, now + 0.22);
+        oscMag.frequency.exponentialRampToValueAtTime(140, now + 0.32);
+        gainMag.gain.setValueAtTime(0.3, now + 0.22);
+        gainMag.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        oscMag.connect(gainMag);
+        gainMag.connect(ctx.destination);
+        oscMag.start(now + 0.22);
+        oscMag.stop(now + 0.36);
+
+        // Stage 3: Bolt slide pull back (t = 0.5s)
+        const oscPull = ctx.createOscillator();
+        const gainPull = ctx.createGain();
+        oscPull.type = 'sawtooth';
+        oscPull.frequency.setValueAtTime(450, now + 0.5);
+        oscPull.frequency.linearRampToValueAtTime(780, now + 0.62);
+        gainPull.gain.setValueAtTime(0.18, now + 0.5);
+        gainPull.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+        oscPull.connect(gainPull);
+        gainPull.connect(ctx.destination);
+        oscPull.start(now + 0.5);
+        oscPull.stop(now + 0.66);
+
+        // Stage 4: Sharp metallic bolt chamber release lock (t = 0.72s)
+        const oscBolt = ctx.createOscillator();
+        const gainBolt = ctx.createGain();
+        oscBolt.type = 'square';
+        oscBolt.frequency.setValueAtTime(1150, now + 0.72);
+        oscBolt.frequency.exponentialRampToValueAtTime(220, now + 0.88);
+        gainBolt.gain.setValueAtTime(0.28, now + 0.72);
+        gainBolt.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+        oscBolt.connect(gainBolt);
+        gainBolt.connect(ctx.destination);
+        oscBolt.start(now + 0.72);
+        oscBolt.stop(now + 0.96);
+      } catch (err) {
+        console.error("Pubg play sound error:", err);
+      }
+    }
+
+    // PUBG MOBILE LITE: Hollow Empty Chamber / Mechanical UI Cancel Sound (~0.4s - 0.5s)
+    function playPubgStopSound() {
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        // Metallic dry-fire hollow hammer click (sharp initial transient)
+        const oscClick = ctx.createOscillator();
+        const gainClick = ctx.createGain();
+        oscClick.type = 'triangle';
+        oscClick.frequency.setValueAtTime(800, now);
+        oscClick.frequency.exponentialRampToValueAtTime(120, now + 0.09);
+        gainClick.gain.setValueAtTime(0.35, now);
+        gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        oscClick.connect(gainClick);
+        gainClick.connect(ctx.destination);
+        oscClick.start(now);
+        oscClick.stop(now + 0.13);
+
+        // Secondary hollow mechanical resonant echo
+        const oscEcho = ctx.createOscillator();
+        const gainEcho = ctx.createGain();
+        oscEcho.type = 'sine';
+        oscEcho.frequency.setValueAtTime(240, now + 0.08);
+        oscEcho.frequency.exponentialRampToValueAtTime(65, now + 0.38);
+        gainEcho.gain.setValueAtTime(0.2, now + 0.08);
+        gainEcho.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+        oscEcho.connect(gainEcho);
+        gainEcho.connect(ctx.destination);
+        oscEcho.start(now + 0.08);
+        oscEcho.stop(now + 0.43);
+      } catch (err) {
+        console.error("Pubg stop sound error:", err);
+      }
+    }
+
+    // Web Audio Synthesizer Beep for RPG victory chime
+    function playVictoryChime() {
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 RPG victory arpeggio
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+          gain.gain.setValueAtTime(0.001, ctx.currentTime + idx * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + idx * 0.12 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.12 + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.12);
+          osc.stop(ctx.currentTime + idx * 0.12 + 0.4);
+        });
+      } catch (err) {
+        console.error("Audio chime error:", err);
+      }
+    }
+
+    // Gentle Rest Complete Chime
+    function playRestCompleteChime() {
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const notes = [440, 554.37, 659.25]; // A4, C#5, E5 soothing chime
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.16);
+          gain.gain.setValueAtTime(0.001, ctx.currentTime + idx * 0.16);
+          gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + idx * 0.16 + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.16 + 0.45);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.16);
+          osc.stop(ctx.currentTime + idx * 0.16 + 0.5);
+        });
+      } catch (err) {
+        console.error("Rest chime error:", err);
+      }
+    }
+
+    function App() {
+      // Safe LocalStorage versioned for 6-tier system with starting defaults (XP: 0, Daily XP: 0, Level: 0, Tier 0: Boat)
+      const [xp, setXp] = useState(() => {
+        const saved = localStorage.getItem('bpsc_rpg_xp_v3');
+        return saved !== null ? parseInt(saved, 10) : 0;
+      });
+      const [dailyXp, setDailyXp] = useState(() => {
+        const saved = localStorage.getItem('bpsc_rpg_daily_xp_v3');
+        return saved !== null ? parseInt(saved, 10) : 0;
+      });
+      const [activeTab, setActiveTab] = useState('quests'); // 'quests' | 'bosses' | 'errors' | 'mastery'
+      const [errors, setErrors] = useState(() => {
+        const saved = localStorage.getItem('bpsc_rpg_errors_v3');
+        return saved ? JSON.parse(saved) : INITIAL_ERRORS;
+      });
+      const [syllabus, setSyllabus] = useState(() => {
+        const saved = localStorage.getItem('bpsc_rpg_syllabus_v3');
+        return saved ? JSON.parse(saved) : INITIAL_SYLLABUS;
+      });
+      // Daily streak
+      const [streak, setStreak] = useState(() => {
+        const saved = localStorage.getItem('bpsc_rpg_streak_v3');
+        return saved !== null ? parseInt(saved, 10) : 0;
+      });
+      // Notification toast
+      const [toast, setToast] = useState(null);
+      // Boss Mock Modal state
+      const [mockModalOpen, setMockModalOpen] = useState(false);
+      const [mockScoreInput, setMockScoreInput] = useState('');
+      const [mockTitleInput, setMockTitleInput] = useState('Testbook Full Mock #1');
+      // New Error modal/inputs
+      const [newErrTopic, setNewErrTopic] = useState('');
+      const [newErrCause, setNewErrCause] = useState('Concept');
+
+      // 50-MIN POMODORO STATE
+      const [pomoMode, setPomoMode] = useState('focus'); // 'focus' (50 min) or 'rest' (10 min)
+      const [pomoSecondsLeft, setPomoSecondsLeft] = useState(50 * 60);
+      const [pomoIsActive, setPomoIsActive] = useState(false);
+      const [pomoSessionsCompleted, setPomoSessionsCompleted] = useState(() => {
+        const saved = localStorage.getItem('bpsc_pomo_count_v3');
+        return saved !== null ? parseInt(saved, 10) : 0;
+      });
+
+      const totalTargetSeconds = pomoMode === 'focus' ? 50 * 60 : 10 * 60;
+      const timerRef = useRef(null);
+      const questsSectionRef = useRef(null);
+
+      // Save to localStorage
+      useEffect(() => {
+        localStorage.setItem('bpsc_rpg_xp_v3', xp);
+        localStorage.setItem('bpsc_rpg_daily_xp_v3', dailyXp);
+        localStorage.setItem('bpsc_rpg_errors_v3', JSON.stringify(errors));
+        localStorage.setItem('bpsc_rpg_syllabus_v3', JSON.stringify(syllabus));
+        localStorage.setItem('bpsc_rpg_streak_v3', streak);
+        localStorage.setItem('bpsc_pomo_count_v3', pomoSessionsCompleted);
+      }, [xp, dailyXp, errors, syllabus, streak, pomoSessionsCompleted]);
+
+      // Trigger icons after render
+      useEffect(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      }, [activeTab, mockModalOpen, errors, syllabus, xp, dailyXp, pomoIsActive, pomoMode]);
+
+      const showNotification = (msg, xpGain = 0) => {
+        setToast({ msg, xpGain });
+        setTimeout(() => setToast(null), 3500);
+      };
+
+      // Current Rank computation based on Boat, Noob, Normal, Pro, Legend, GOAT
+      const currentRankInfo = useMemo(() => {
+        for (let i = 0; i < RANKS.length; i++) {
+          if (xp >= RANKS[i].min && xp <= RANKS[i].max) {
+            const nextRank = RANKS[i + 1] || null;
+            const rangeSpan = (RANKS[i].max - RANKS[i].min + 1);
+            const progress = nextRank 
+              ? Math.min(100, Math.floor(((xp - RANKS[i].min) / rangeSpan) * 100))
+              : 100;
+            const toNext = nextRank ? (RANKS[i].max + 1 - xp) : 0;
+            return { current: RANKS[i], next: nextRank, progress, toNext, tierIndex: i };
+          }
+        }
+        return { current: RANKS[0], next: RANKS[1], progress: 0, toNext: 2501, tierIndex: 0 };
+      }, [xp]);
+
+      const gainXP = (amount, questName) => {
+        const prevDaily = dailyXp;
+        const newDaily = prevDaily + amount;
+        setXp(prev => prev + amount);
+        setDailyXp(newDaily);
+        // Check if just crossed daily threshold 400
+        if (prevDaily < 400 && newDaily >= 400) {
+          if (window.confetti) {
+            window.confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+          }
+          showNotification("🎉 DAILY REWARD UNLOCKED: 45 MINS BGMI / PUBG!", amount);
+        } else {
+          showNotification(`⚔️ Quest Cleared: +${amount} XP! (${questName})`, amount);
+        }
+      };
+
+      // Pomodoro complete handler (Auto-awarded on timer completion or skip)
+      const handlePomodoroComplete = () => {
+        playVictoryChime();
+        if (window.confetti) {
+          window.confetti({ particleCount: 130, spread: 85, origin: { y: 0.6 } });
+        }
+        gainXP(55, "Pomodoro Focus (50m Complete)");
+        setPomoSessionsCompleted(c => c + 1);
+        showNotification("🎯 Pomodoro Drill Complete! +55 XP Claimed", 55);
+        // Auto switch to 10 min rest mode in stopped/paused state
+        setPomoMode('rest');
+        setPomoSecondsLeft(10 * 60);
+        setPomoIsActive(false);
+      };
+
+      // Pomodoro Rest complete handler
+      const handleRestComplete = () => {
+        playRestCompleteChime();
+        showNotification("⚡ Break over! Ready for next battle drill", 0);
+        setPomoMode('focus');
+        setPomoSecondsLeft(50 * 60);
+        setPomoIsActive(false);
+      };
+
+      // Dynamic Toggle Drill handler with PUBG Synthesized SFX
+      const handleToggleDrill = () => {
+        if (!pomoIsActive) {
+          // Starting drill -> play PUBG reload / gun cocking sound
+          playPubgPlaySound();
+          setPomoIsActive(true);
+        } else {
+          // Stopping drill -> play PUBG empty chamber / mechanical cancel sound
+          playPubgStopSound();
+          setPomoIsActive(false);
+        }
+      };
+
+      // Pomodoro Ticker: Strictly detects when timer reaches 0 and auto-transitions
+      useEffect(() => {
+        if (pomoIsActive) {
+          timerRef.current = setInterval(() => {
+            setPomoSecondsLeft(prev => {
+              if (prev <= 1) {
+                clearInterval(timerRef.current);
+                if (pomoMode === 'focus') {
+                  handlePomodoroComplete();
+                } else {
+                  handleRestComplete();
+                }
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        } else {
+          clearInterval(timerRef.current);
+        }
+        return () => clearInterval(timerRef.current);
+      }, [pomoIsActive, pomoMode]);
+
+      // Switch Pomodoro mode
+      const switchPomoMode = (mode) => {
+        setPomoIsActive(false);
+        setPomoMode(mode);
+        setPomoSecondsLeft(mode === 'focus' ? 50 * 60 : 10 * 60);
+      };
+
+      // Format seconds to MM:SS
+      const formatTime = (secs) => {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      };
+
+      // Mock test submission
+      const handleBossSubmit = (e) => {
+        e.preventDefault();
+        const score = parseFloat(mockScoreInput);
+        if (isNaN(score) || score < 0 || score > 150) {
+          alert("Please enter a valid mock test score between 0 and 150.");
+          return;
+        }
+        let earned = 300;
+        if (score >= 105) {
+          earned += 100;
+          if (window.confetti) {
+            window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
+          }
+        }
+        gainXP(earned, `${mockTitleInput} [${score}/150]`);
+        setMockModalOpen(false);
+        setMockScoreInput('');
+      };
+
+      // Toggle respawn
+      const toggleRespawn = (id) => {
+        setErrors(prev => prev.map(item => {
+          if (item.id === id) {
+            const nextVal = !item.respawned;
+            if (nextVal) {
+              gainXP(30, "Respawn Revise Complete");
+            }
+            return { ...item, respawned: nextVal };
+          }
+          return item;
+        }));
+      };
+
+      // Add new error
+      const handleAddError = (e) => {
+        e.preventDefault();
+        if (!newErrTopic.trim()) return;
+        const newEntry = {
+          id: 'err-' + Date.now(),
+          topic: newErrTopic.trim(),
+          cause: newErrCause,
+          respawned: false,
+          timestamp: 'Just now'
+        };
+        setErrors([newEntry, ...errors]);
+        setNewErrTopic('');
+        showNotification("💀 Mistake logged to Respawn Chamber!");
+      };
+
+      // Toggle Syllabus Cell
+      const toggleSyllabusCol = (id, field) => {
+        setSyllabus(prev => prev.map(item => {
+          if (item.id === id) {
+            const nextVal = !item[field];
+            if (nextVal) {
+              gainXP(20, `${item.topic} (${field.toUpperCase()} Mastered)`);
+            }
+            return { ...item, [field]: nextVal };
+          }
+          return item;
+        }));
+      };
+
+      const scrollToQuests = () => {
+        if (questsSectionRef.current) {
+          questsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      };
+
+      const dailyGoalProgress = Math.min(100, Math.floor((dailyXp / 400) * 100));
+      const isDailyUnlocked = dailyXp >= 400;
+
+      // Pomodoro progress percentage
+      const pomoElapsedPercent = Math.min(100, Math.max(0, Math.round(((totalTargetSeconds - pomoSecondsLeft) / totalTargetSeconds) * 100)));
+
+      // Calculated Level: Level 0 at 0 XP (Math.floor(xp / 1000))
+      const currentLevel = Math.floor(xp / 1000);
+
+      return (
+        <div className="max-w-md mx-auto px-3 pt-3">
+          {/* TOAST ALERT */}
+          {toast && (
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-sm bg-game-surface border-2 border-game-neonGreen text-white px-4 py-3 rounded-xl shadow-neon-green flex items-center gap-3 animate-bounce">
+              <i data-lucide="zap" className="w-5 h-5 text-game-neonGreen shrink-0"></i>
+              <div className="text-xs font-chakra tracking-wide leading-tight">
+                {toast.msg}
+              </div>
+            </div>
+          )}
+
+          {/* TOP APP BAR / BRAND HEADER */}
+          <header className="flex items-center justify-between py-2 border-b border-game-border/80 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-cyan-600 to-emerald-400 p-0.5 shadow-neon-cyan flex items-center justify-center font-orbitron font-black text-black text-base">
+                ⚔️
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h1 className="font-orbitron font-extrabold text-sm tracking-wider text-white">
+                    BPSC <span className="text-game-neonGreen">TRE 4.0</span> PRT
+                  </h1>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    RPG HUD
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 font-chakra">
+                  Target Cutoff: <span className="text-amber-300 font-bold">110+ / 150</span>
+                </p>
+              </div>
+            </div>
+            {/* Streak Counter */}
+            <div className="flex items-center gap-1.5 bg-game-card/80 border border-orange-500/40 px-2.5 py-1.5 rounded-lg shadow-sm">
+              <span className="text-sm">🔥</span>
+              <div className="text-right">
+                <span className="text-xs font-orbitron font-bold text-orange-400">{streak}</span>
+                <span className="text-[9px] text-slate-400 block leading-none">Days Streak</span>
+              </div>
+            </div>
+          </header>
+
+          {/* PLAYER DASHBOARD / STAT CARD */}
+          <section className="bg-game-surface border border-game-border rounded-2xl p-4 mb-3 relative overflow-hidden hud-border shadow-xl">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none"></div>
+            {/* Rank and Player Identity */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className={`w-12 h-12 rounded-xl bg-game-card border-2 ${currentRankInfo.current.border} flex items-center justify-center text-2xl shadow-lg`}>
+                    {currentRankInfo.current.icon}
+                  </div>
+                  <span className="absolute -bottom-1 -right-1 text-[9px] font-bold bg-game-dark px-1 rounded border border-slate-700 text-cyan-300 font-mono">
+                    Lvl {currentLevel}
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-orbitron font-extrabold uppercase tracking-wide ${currentRankInfo.current.color}`}>
+                      {currentRankInfo.current.name}
+                    </span>
+                    <span className="text-[10px] bg-slate-800/80 px-1.5 py-0.5 rounded text-slate-300 font-mono">
+                      {currentRankInfo.current.badge}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Class Perk: <span className="text-emerald-400">{currentRankInfo.current.perk}</span>
+                  </p>
+                </div>
+              </div>
+              {/* Reset Day Button */}
+              <button 
+                onClick={() => {
+                  if (confirm("Initiate fresh study day? Resets today's XP to 0 and advances streak.")) {
+                    setDailyXp(0);
+                    setStreak(s => s + 1);
+                    showNotification("🌅 New Day Initiated! Streak updated.");
+                  }
+                }}
+                title="Reset Daily XP for today"
+                className="text-[10px] text-slate-400 hover:text-slate-200 bg-game-dark/80 border border-slate-700 px-2 py-1 rounded flex items-center gap-1 active:scale-95 transition-all"
+              >
+                <span>↻</span> New Day
+              </button>
+            </div>
+            {/* Main XP Counter */}
+            <div className="flex items-baseline justify-between mb-1.5">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-orbitron font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-cyan-400 to-emerald-200">
+                  {xp.toLocaleString()}
+                </span>
+                <span className="text-xs font-chakra font-bold text-slate-400">TOTAL XP</span>
+              </div>
+              <div className="text-right text-[11px] font-mono text-slate-400">
+                {currentRankInfo.next ? (
+                  <>Next Rank ({currentRankInfo.next.name}): <span className="text-cyan-400 font-bold">{currentRankInfo.toNext.toLocaleString()} XP left</span></>
+                ) : (
+                  <span className="text-amber-400 font-bold">MAX RANK ACHIEVED!</span>
+                )}
+              </div>
+            </div>
+            {/* Rank Progress Bar */}
+            <div className="w-full bg-game-dark/90 h-2.5 rounded-full p-0.5 border border-slate-800 mb-3 overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 rounded-full transition-all duration-500 shadow-neon-green"
+                style={{ width: `${currentRankInfo.progress}%` }}
+              ></div>
+            </div>
+            {/* 6-TIER RANKS LEGEND DRAWER: Boat, Noob, Normal, Pro, Legend, GOAT */}
+            <div className="grid grid-cols-6 gap-1 pt-2 border-t border-slate-800/80 text-center">
+              {RANKS.map((r) => {
+                const isActive = currentRankInfo.current.name === r.name;
+                return (
+                  <div 
+                    key={r.name} 
+                    className={`py-1.5 px-0.5 rounded-lg transition-all ${
+                      isActive 
+                        ? 'bg-cyan-950/80 border border-cyan-400 text-cyan-300 font-bold shadow-neon-cyan scale-[1.04]' 
+                        : 'opacity-40 hover:opacity-75 bg-slate-900/40 border border-transparent'
+                    }`}
+                  >
+                    <div className="text-sm leading-none mb-1">{r.icon}</div>
+                    <div className="text-[8.5px] font-chakra font-bold tracking-tight truncate leading-none">
+                      {r.name}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* REWARD & LOCK SYSTEM (400 DAILY XP GOAL) */}
+          <section className={`border rounded-2xl p-3.5 mb-2.5 relative overflow-hidden transition-all duration-300 ${
+            isDailyUnlocked 
+              ? 'bg-gradient-to-br from-emerald-950/70 via-game-surface to-teal-950/40 border-emerald-500/80 shadow-neon-green' 
+              : 'bg-game-surface/90 border-game-border'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  isDailyUnlocked ? 'bg-emerald-500 text-black shadow-neon-green' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  <i data-lucide={isDailyUnlocked ? "unlock" : "lock"} className="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h3 className="font-chakra font-bold text-xs uppercase tracking-wider text-slate-200">
+                    Daily Bounty Gate (Goal: 400 XP)
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    Today: <span className={isDailyUnlocked ? 'text-emerald-400 font-bold' : 'text-cyan-400 font-bold'}>{dailyXp}</span> / 400 XP
+                  </p>
+                </div>
+              </div>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                isDailyUnlocked 
+                  ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-500/40 animate-pulse' 
+                  : 'bg-slate-800 text-slate-400'
+              }`}>
+                {isDailyUnlocked ? 'UNLOCKED' : `${400 - dailyXp > 0 ? 400 - dailyXp : 0} XP needed`}
+              </span>
+            </div>
+            {/* Daily XP Mini Bar */}
+            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800 mb-2">
+              <div 
+                className={`h-full transition-all duration-500 ${isDailyUnlocked ? 'bg-gradient-to-r from-emerald-400 to-green-300 shadow-neon-green' : 'bg-gradient-to-r from-cyan-500 to-blue-500'}`}
+                style={{ width: `${dailyGoalProgress}%` }}
+              ></div>
+            </div>
+            {/* Lock Status / Reward Message */}
+            {isDailyUnlocked ? (
+              <div className="bg-emerald-950/80 border border-emerald-500/50 rounded-xl p-2.5 flex items-center gap-2.5 animate-pulse">
+                <span className="text-xl">🎮</span>
+                <div>
+                  <div className="text-xs font-chakra font-bold text-emerald-300">
+                    DAILY REWARD UNLOCKED!
+                  </div>
+                  <div className="text-[11px] text-slate-300">
+                    Authorized Perk: <span className="text-amber-300 font-semibold">45 Mins of BGMI / PUBG Mobile Lite</span> without guilt!
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 text-slate-400">
+                <span className="text-lg opacity-60">🔒</span>
+                <div className="text-[11px] leading-tight">
+                  <span className="text-slate-300 font-medium">Rewards Locked:</span> Complete Pomodoros or NCERT chapters to unlock your 45-min BGMI gaming break.
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* NICHE DEKHIYE (LOOK BELOW INDICATOR BANNER) */}
+          <div 
+            onClick={scrollToQuests}
+            className="mb-3 cursor-pointer group bg-gradient-to-r from-cyan-950/70 via-game-surface to-emerald-950/60 border border-cyan-500/40 hover:border-cyan-400 rounded-xl px-3 py-2 flex items-center justify-between shadow-sm active:scale-[0.99] transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-base animate-niche-bounce inline-block">👇</span>
+              <div>
+                <div className="text-xs font-chakra font-bold text-cyan-300 group-hover:text-cyan-200 flex items-center gap-1.5">
+                  <span>नीचे देखिए (Niche Dekhiye)</span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-200 border border-cyan-500/30">
+                    Scroll Down
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Daily Quests, 50m Focus Drill &amp; Error Log Below
+                </p>
+              </div>
+            </div>
+            <div className="w-6 h-6 rounded-lg bg-cyan-950/80 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:translate-y-0.5 transition-transform animate-niche-bounce">
+              <i data-lucide="chevron-down" className="w-3.5 h-3.5"></i>
+            </div>
+          </div>
+
+          {/* NAVIGATION TABS */}
+          <nav className="grid grid-cols-4 gap-1.5 p-1 bg-game-surface border border-game-border rounded-xl mb-3.5 text-center">
+            <button
+              onClick={() => setActiveTab('quests')}
+              className={`py-2 px-1 rounded-lg text-xs font-chakra font-bold flex flex-col items-center gap-1 transition-all ${
+                activeTab === 'quests' 
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <i data-lucide="sword" className="w-3.5 h-3.5"></i>
+              <span>Quests</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('bosses')}
+              className={`py-2 px-1 rounded-lg text-xs font-chakra font-bold flex flex-col items-center gap-1 transition-all ${
+                activeTab === 'bosses' 
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <i data-lucide="flame" className="w-3.5 h-3.5"></i>
+              <span>Boss Raid</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('errors')}
+              className={`py-2 px-1 rounded-lg text-xs font-chakra font-bold flex flex-col items-center gap-1 transition-all ${
+                activeTab === 'errors' 
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <i data-lucide="rotate-ccw" className="w-3.5 h-3.5"></i>
+              <span>Respawn ({errors.filter(e => !e.respawned).length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('mastery')}
+              className={`py-2 px-1 rounded-lg text-xs font-chakra font-bold flex flex-col items-center gap-1 transition-all ${
+                activeTab === 'mastery' 
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <i data-lucide="check-square" className="w-3.5 h-3.5"></i>
+              <span>Mastery</span>
+            </button>
+          </nav>
+
+          {/* TAB 1: DAILY QUEST LOG (XP ALLOCATION + INTERACTIVE 50-MIN POMODORO) */}
+          {activeTab === 'quests' && (
+            <section ref={questsSectionRef} className="space-y-3">
+              <div className="flex items-center justify-between mb-0.5">
+                <h2 className="text-xs font-orbitron font-bold text-slate-300 flex items-center gap-1.5 uppercase">
+                  <i data-lucide="target" className="w-3.5 h-3.5 text-game-neonCyan"></i>
+                  Active Battle Tasks &amp; Timer
+                </h2>
+                <span className="text-[10px] text-slate-400 font-mono">Tap button to claim XP</span>
+              </div>
+
+              {/* 50-MIN POMODORO FOCUS DRILL WIDGET */}
+              <div className={`bg-game-surface border rounded-2xl p-4 transition-all relative overflow-hidden hud-border ${
+                pomoIsActive 
+                  ? 'border-cyan-400 shadow-neon-cyan ring-1 ring-cyan-500/30' 
+                  : 'border-cyan-500/40 shadow-md'
+              }`}>
+                {/* Background aura pulse when active */}
+                {pomoIsActive && (
+                  <div className="absolute inset-0 bg-cyan-500/5 animate-pulse pointer-events-none"></div>
+                )}
+
+                {/* Top selector: 50m Focus vs 10m Rest */}
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-base ${
+                      pomoMode === 'focus' ? 'bg-cyan-950/80 text-cyan-400 border border-cyan-500/40' : 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40'
+                    }`}>
+                      {pomoMode === 'focus' ? '⏳' : '☕'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-xs font-chakra font-bold text-slate-100">
+                          {pomoMode === 'focus' ? 'Pomodoro Focus Drill (50 min)' : 'Post-Session Rest (10 min)'}
+                        </h4>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                          pomoMode === 'focus' 
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' 
+                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        }`}>
+                          {pomoMode === 'focus' ? '+55 XP' : 'Recovery'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        {pomoMode === 'focus' ? 'Deep BPSC PRT / NCERT Immersion' : 'Refresh minds before next battle wave'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Mode Toggles */}
+                  <div className="flex items-center bg-game-dark p-0.5 rounded-lg border border-slate-800 text-[10px] font-chakra font-bold">
+                    <button
+                      onClick={() => switchPomoMode('focus')}
+                      className={`px-2 py-1 rounded transition-all ${
+                        pomoMode === 'focus' 
+                          ? 'bg-cyan-500 text-black shadow-sm font-extrabold' 
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      50m Focus
+                    </button>
+                    <button
+                      onClick={() => switchPomoMode('rest')}
+                      className={`px-2 py-1 rounded transition-all ${
+                        pomoMode === 'rest' 
+                          ? 'bg-emerald-500 text-black shadow-sm font-extrabold' 
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      10m Rest
+                    </button>
+                  </div>
+                </div>
+
+                {/* COUNTDOWN DISPLAY & CIRCULAR/GAUGE HUD */}
+                <div className="bg-game-dark/80 border border-slate-800/90 rounded-xl p-3.5 text-center relative mb-3">
+                  <div className="flex items-center justify-between text-[11px] font-chakra text-slate-400 mb-1 px-1">
+                    <span className="flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full ${pomoIsActive ? 'bg-emerald-400 animate-ping' : 'bg-slate-600'}`}></span>
+                      {pomoIsActive ? (pomoMode === 'focus' ? 'BPSC Focus Mode Active' : 'Resting Aura...') : 'Paused / Standby'}
+                    </span>
+                    <span className="font-mono text-cyan-400">
+                      Streak: <span className="text-white font-bold">{pomoSessionsCompleted}</span> sessions
+                    </span>
+                  </div>
+
+                  {/* Giant Glowing Digital Timer */}
+                  <div className="py-1">
+                    <div className={`font-orbitron font-black text-4xl tracking-widest ${
+                      pomoMode === 'focus'
+                        ? (pomoIsActive ? 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 filter drop-shadow(0 0 10px rgba(6,182,212,0.4))' : 'text-cyan-400')
+                        : 'text-emerald-400'
+                    }`}>
+                      {formatTime(pomoSecondsLeft)}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 tracking-wider mt-0.5">
+                      {pomoMode === 'focus' ? 'TARGET: 50 MINS FOCUS PROTOCOL' : 'TARGET: 10 MINS COOLDOWN'}
+                    </div>
+                  </div>
+
+                  {/* Linear Progress Bar with percentage HUD */}
+                  <div className="w-full bg-slate-900/90 h-2 rounded-full overflow-hidden border border-slate-800 mt-2 mb-1">
+                    <div 
+                      className={`h-full transition-all duration-300 ${
+                        pomoMode === 'focus'
+                          ? 'bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-400 shadow-neon-cyan'
+                          : 'bg-gradient-to-r from-emerald-500 to-green-400 shadow-neon-green'
+                      }`}
+                      style={{ width: `${pomoElapsedPercent}%` }}
+                    ></div>
+                  </div>
+                  <div className="flex justify-between text-[9px] font-mono text-slate-500 px-0.5">
+                    <span>0% Start</span>
+                    <span className="text-cyan-400 font-bold">{pomoElapsedPercent}% Complete</span>
+                    <span>100% Finish</span>
+                  </div>
+                </div>
+
+                {/* CONTROLS BAR: Dynamic Play/Stop Button + Reset Button */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleToggleDrill}
+                    className={`flex-1 py-3 px-4 rounded-xl font-orbitron font-extrabold text-xs tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+                      pomoIsActive
+                        ? 'bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 text-white shadow-lg shadow-rose-900/50'
+                        : 'bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-black shadow-neon-green'
+                    }`}
+                  >
+                    <span>{pomoIsActive ? '⏹' : '▶'}</span>
+                    <span>{pomoIsActive ? 'STOP DRILL' : 'PLAY DRILL'}</span>
+                  </button>
+
+                  {/* Reset Button */}
+                  <button
+                    onClick={() => {
+                      setPomoIsActive(false);
+                      setPomoSecondsLeft(pomoMode === 'focus' ? 50 * 60 : 10 * 60);
+                    }}
+                    title="Reset Timer"
+                    className="bg-game-dark hover:bg-slate-800 text-slate-300 border border-slate-700/80 px-3.5 py-3 rounded-xl font-chakra font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+                  >
+                    <i data-lucide="rotate-ccw" className="w-3.5 h-3.5"></i>
+                    <span>Reset</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quest 2: Chapter Completion */}
+              <div className="bg-game-surface border border-slate-800 hover:border-emerald-500/50 rounded-xl p-3.5 flex items-center justify-between transition-all group">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-950/60 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg group-hover:scale-105 transition-transform">
+                    📖
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-chakra font-bold text-slate-100">
+                      Chapter Completion (SCERT/NCERT)
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      e.g., NCERT Class 8 Science Ch 9: Friction
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => gainXP(100, "NCERT/SCERT Chapter Finish")}
+                  className="bg-emerald-500/10 hover:bg-emerald-500 hover:text-black text-emerald-400 border border-emerald-500/40 font-orbitron font-bold text-xs px-3 py-2 rounded-lg transition-all active:scale-95 shrink-0 shadow-sm"
+                >
+                  +100 XP
+                </button>
+              </div>
+
+              {/* Quest 3: MCQs Drill */}
+              <div className="bg-game-surface border border-slate-800 hover:border-amber-500/50 rounded-xl p-3.5 flex items-center justify-between transition-all group">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-amber-950/60 border border-amber-500/30 flex items-center justify-center text-amber-400 text-lg group-hover:scale-105 transition-transform">
+                    🎯
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-chakra font-bold text-slate-100">
+                      MCQs Speed Practice Drill
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      30-50 Rapid Questions (Maths, Science or INM)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => gainXP(50, "MCQs Practice Drill")}
+                  className="bg-amber-500/10 hover:bg-amber-500 hover:text-black text-amber-400 border border-amber-500/40 font-orbitron font-bold text-xs px-3 py-2 rounded-lg transition-all active:scale-95 shrink-0 shadow-sm"
+                >
+                  +50 XP
+                </button>
+              </div>
+
+              {/* Quest 4: Full Mock Test Boss trigger */}
+              <div className="bg-gradient-to-r from-purple-950/60 via-game-surface to-slate-900 border-2 border-purple-500/60 rounded-xl p-3.5 flex items-center justify-between shadow-neon-purple">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-purple-500/20 border border-purple-400 flex items-center justify-center text-purple-300 text-xl animate-bounce">
+                    👹
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-xs font-chakra font-bold text-purple-200">
+                        Testbook Full Mock Test (150 Qs)
+                      </h4>
+                      <span className="text-[9px] bg-amber-400/20 text-amber-300 px-1 rounded font-bold">
+                        BOSS RAID
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      +300 XP (+100 XP Bonus if score &gt; 105)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMockModalOpen(true)}
+                  className="bg-purple-600 hover:bg-purple-500 text-white font-orbitron font-black text-xs px-3.5 py-2 rounded-lg transition-all active:scale-95 shrink-0 shadow-lg"
+                >
+                  Raid Boss
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* TAB 2: BOSS RAID & MOCK TEST SIMULATOR */}
+          {activeTab === 'bosses' && (
+            <section className="space-y-3">
+              <div className="bg-game-surface border border-purple-500/40 rounded-2xl p-4 text-center relative overflow-hidden">
+                <div className="w-16 h-16 mx-auto bg-purple-950/80 border-2 border-purple-400 rounded-2xl flex items-center justify-center text-3xl mb-2 shadow-neon-purple">
+                  👾
+                </div>
+                <h3 className="font-orbitron font-black text-sm text-purple-300">
+                  TRE 4.0 FINAL EXAM BOSS
+                </h3>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto mt-0.5">
+                  The BPSC Examination Commission awaits. Defeat full mock tests to shatter the 110+ cutoff gate!
+                </p>
+                <div className="mt-4 pt-3 border-t border-slate-800 grid grid-cols-2 gap-2 text-left">
+                  <div className="bg-game-dark/80 p-2.5 rounded-lg border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-chakra">Base Bounty</span>
+                    <span className="text-sm font-orbitron font-bold text-purple-400">+300 XP</span>
+                  </div>
+                  <div className="bg-game-dark/80 p-2.5 rounded-lg border border-amber-500/30">
+                    <span className="text-[10px] text-amber-300 block font-chakra">Cutoff Slayer (&gt;105)</span>
+                    <span className="text-sm font-orbitron font-bold text-amber-400">+100 XP Bonus</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMockModalOpen(true)}
+                  className="w-full mt-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-orbitron font-black py-2.5 rounded-xl shadow-neon-purple active:scale-[0.98] transition-transform text-xs tracking-wider"
+                >
+                  ⚔️ LOG NEW MOCK TEST RESULT
+                </button>
+              </div>
+              {/* Boss Raid Guide card */}
+              <div className="bg-game-surface border border-game-border rounded-xl p-3">
+                <h4 className="text-xs font-orbitron font-bold text-slate-300 mb-2 flex items-center gap-1.5">
+                  <i data-lucide="shield-alert" className="w-3.5 h-3.5 text-purple-400"></i>
+                  Mock Test Battle Tactics
+                </h4>
+                <div className="space-y-2 text-[11px] text-slate-300 font-chakra">
+                  <div className="p-2.5 rounded-lg bg-game-dark/70 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-purple-300 font-bold block">Qualifying Language (30 Qs)</span>
+                      <span className="text-slate-400 text-[10px]">Zero negative marks, need 9 marks minimum</span>
+                    </div>
+                    <span className="text-xs font-orbitron font-bold text-slate-400">Step 1</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-game-dark/70 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-cyan-300 font-bold block">General Studies (120 Qs)</span>
+                      <span className="text-slate-400 text-[10px]">Primary merit ranker: Math, Science, INM &amp; Bihar Geo</span>
+                    </div>
+                    <span className="text-xs font-orbitron font-bold text-cyan-400">Step 2</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* TAB 3: ERROR LOG (RESPAWN SYSTEM) */}
+          {activeTab === 'errors' && (
+            <section className="space-y-3">
+              <div className="bg-game-surface border border-rose-500/40 rounded-xl p-3.5">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⚰️</span>
+                    <div>
+                      <h3 className="font-chakra font-bold text-xs text-rose-300 uppercase">
+                        Respawn Chamber (Error Log)
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        Revise mistakes within 24h to respawn &amp; earn +30 XP!
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950 border border-rose-500/40 text-rose-300">
+                    {errors.filter(e => !e.respawned).length} Critical
+                  </span>
+                </div>
+                {/* Form to log new mistake */}
+                <form onSubmit={handleAddError} className="space-y-2 mt-3 pt-3 border-t border-slate-800">
+                  <input
+                    type="text"
+                    value={newErrTopic}
+                    onChange={(e) => setNewErrTopic(e.target.value)}
+                    placeholder="Question topic (e.g., Kunwar Singh revolt location)..."
+                    className="w-full bg-game-dark border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-rose-400"
+                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={newErrCause}
+                      onChange={(e) => setNewErrCause(e.target.value)}
+                      className="bg-game-dark border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none"
+                    >
+                      <option value="Concept">Concept Gap</option>
+                      <option value="Calculation">Calculation Slip</option>
+                      <option value="Silly Error">Silly Error / Misread</option>
+                    </select>
+                    <button
+                      type="submit"
+                      className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-chakra font-bold text-xs py-1.5 rounded-lg transition-all"
+                    >
+                      + Log Mistake
+                    </button>
+                  </div>
+                </form>
+              </div>
+              {/* Error list with Respawn Checkbox */}
+              <div className="space-y-2">
+                {errors.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`p-3 rounded-xl border transition-all ${
+                      item.respawned 
+                        ? 'bg-slate-900/60 border-slate-800 opacity-60' 
+                        : 'bg-game-surface border-rose-500/30 shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            item.cause === 'Concept' ? 'bg-purple-900/60 text-purple-300 border border-purple-700' :
+                            item.cause === 'Calculation' ? 'bg-cyan-900/60 text-cyan-300 border border-cyan-700' :
+                            'bg-amber-900/60 text-amber-300 border border-amber-700'
+                          }`}>
+                            {item.cause}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">{item.timestamp}</span>
+                        </div>
+                        <h4 className={`text-xs font-chakra font-semibold ${item.respawned ? 'line-through text-slate-400' : 'text-slate-100'}`}>
+                          {item.topic}
+                        </h4>
+                      </div>
+                      {/* Respawn Button / Checkbox */}
+                      <button
+                        onClick={() => toggleRespawn(item.id)}
+                        className={`px-2.5 py-1.5 rounded-lg font-chakra font-bold text-xs flex items-center gap-1.5 transition-all ${
+                          item.respawned
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40'
+                            : 'bg-rose-950 text-rose-300 border border-rose-500/50 hover:bg-rose-900'
+                        }`}
+                      >
+                        <i data-lucide={item.respawned ? "check-circle" : "refresh-cw"} className="w-3.5 h-3.5"></i>
+                        <span>{item.respawned ? 'Respawned' : 'Respawn'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* TAB 4: SUBJECT-WISE MASTERY GRID */}
+          {activeTab === 'mastery' && (
+            <section className="space-y-3">
+              <div className="bg-game-surface border border-emerald-500/40 rounded-xl p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-chakra font-bold text-xs text-emerald-300 uppercase">
+                      BPSC Syllabus Mastery Matrix
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Tap cells to mark complete and earn +20 XP per milestone!
+                    </p>
+                  </div>
+                  <span className="text-xs font-orbitron font-bold text-emerald-400">
+                    {Math.round((syllabus.filter(s => s.scert && s.notes && s.pyq).length / syllabus.length) * 100)}% Complete
+                  </span>
+                </div>
+              </div>
+              {/* Topic Cards / Table for Mobile */}
+              <div className="space-y-2">
+                {syllabus.map((row) => (
+                  <div key={row.id} className="bg-game-surface border border-slate-800 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400 font-mono">
+                        {row.subject}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {row.scert && row.notes && row.pyq ? '✨ 100% Mastered' : '⚔️ In Progress'}
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-chakra font-bold text-slate-100 mb-3">
+                      {row.topic}
+                    </h4>
+                    {/* Columns checklist */}
+                    <div className="grid grid-cols-3 gap-1.5 text-center">
+                      {/* SCERT/NCERT Read */}
+                      <button
+                        onClick={() => toggleSyllabusCol(row.id, 'scert')}
+                        className={`py-1.5 px-1 rounded text-[11px] font-chakra font-semibold flex items-center justify-center gap-1 transition-all border ${
+                          row.scert 
+                            ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300' 
+                            : 'bg-game-dark border-slate-800 text-slate-500 hover:border-slate-700'
+                        }`}
+                      >
+                        <i data-lucide={row.scert ? "check" : "circle"} className="w-3 h-3"></i>
+                        <span>SCERT Read</span>
+                      </button>
+                      {/* Notes Ready */}
+                      <button
+                        onClick={() => toggleSyllabusCol(row.id, 'notes')}
+                        className={`py-1.5 px-1 rounded text-[11px] font-chakra font-semibold flex items-center justify-center gap-1 transition-all border ${
+                          row.notes 
+                            ? 'bg-cyan-950/80 border-cyan-500/60 text-cyan-300' 
+                            : 'bg-game-dark border-slate-800 text-slate-500 hover:border-slate-700'
+                        }`}
+                      >
+                        <i data-lucide={row.notes ? "check" : "circle"} className="w-3 h-3"></i>
+                        <span>Notes Ready</span>
+                      </button>
+                      {/* PYQ Practice */}
+                      <button
+                        onClick={() => toggleSyllabusCol(row.id, 'pyq')}
+                        className={`py-1.5 px-1 rounded text-[11px] font-chakra font-semibold flex items-center justify-center gap-1 transition-all border ${
+                          row.pyq 
+                            ? 'bg-purple-950/80 border-purple-500/60 text-purple-300' 
+                            : 'bg-game-dark border-slate-800 text-slate-500 hover:border-slate-700'
+                        }`}
+                      >
+                        <i data-lucide={row.pyq ? "check" : "circle"} className="w-3 h-3"></i>
+                        <span>PYQ Drills</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* BOSS RAID LOG MODAL */}
+          {mockModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-game-surface border-2 border-purple-500 rounded-2xl p-4 w-full max-w-sm shadow-neon-purple relative animate-in fade-in zoom-in duration-150">
+                <button 
+                  onClick={() => setMockModalOpen(false)}
+                  className="absolute top-3 right-3 text-slate-400 hover:text-white"
+                >
+                  <i data-lucide="x" className="w-5 h-5"></i>
+                </button>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-2xl">👹</span>
+                  <div>
+                    <h3 className="font-orbitron font-bold text-sm text-purple-300">
+                      Log Boss Battle (Mock Test)
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-chakra">
+                      150 Total Questions — BPSC TRE 4.0 Standard
+                    </p>
+                  </div>
+                </div>
+                <form onSubmit={handleBossSubmit} className="space-y-3">
+                  <div>
+                    <label className="text-[11px] text-slate-300 font-chakra block mb-1">
+                      Mock Test Title / Platform
+                    </label>
+                    <input
+                      type="text"
+                      value={mockTitleInput}
+                      onChange={(e) => setMockTitleInput(e.target.value)}
+                      className="w-full bg-game-dark border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-purple-400"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[11px] text-slate-300 font-chakra">
+                        Raw Score (out of 150)
+                      </label>
+                      <span className="text-[10px] text-amber-400 font-mono">
+                        Target Cutoff: 110+
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="150"
+                      value={mockScoreInput}
+                      onChange={(e) => setMockScoreInput(e.target.value)}
+                      placeholder="e.g. 108.5"
+                      className="w-full bg-game-dark border border-slate-700 rounded-lg p-2 text-base font-orbitron font-bold text-cyan-300 focus:outline-none focus:border-cyan-400"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  <div className="bg-game-dark/90 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Completion Loot:</span>
+                      <span className="text-purple-400 font-bold font-mono">+300 XP</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Cutoff Bonus (&gt; 105):</span>
+                      <span className="text-amber-400 font-bold font-mono">+100 XP</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setMockModalOpen(false)}
+                      className="flex-1 py-2 text-xs font-chakra font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2 text-xs font-orbitron font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 text-white rounded-xl shadow-neon-purple active:scale-95"
+                    >
+                      Claim Loot
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* STICKY QUICK-STATS FOOTER BAR */}
+          <footer className="fixed bottom-0 left-0 right-0 bg-[#080c14]/95 backdrop-blur-md border-t border-slate-800 py-2.5 px-4 z-40 max-w-md mx-auto">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${pomoIsActive ? 'bg-cyan-400 animate-ping' : 'bg-emerald-400'}`}></span>
+                <span className="text-[11px] text-slate-300 font-chakra">
+                  Timer: <span className={pomoIsActive ? "text-cyan-400 font-bold font-mono" : "text-emerald-400 font-bold font-mono"}>
+                    {formatTime(pomoSecondsLeft)} {pomoIsActive ? '(Focusing)' : '(Ready)'}
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-center gap-3 font-mono text-[11px]">
+                <div>
+                  <span className="text-slate-400">Today: </span>
+                  <span className="text-cyan-400 font-bold">{dailyXp}/400 XP</span>
+                </div>
+                <div className="border-l border-slate-700 pl-2">
+                  <span className="text-slate-400">Total: </span>
+                  <span className="text-emerald-400 font-bold">{xp.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body></html>
